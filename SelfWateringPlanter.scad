@@ -86,7 +86,7 @@ module inner_shape(dim, ro, ri, top_h, bottom_h) {
                     round_rect(dim.x, dim.y, ro+GAP+WALL);
             }
         }
-        translate([-WALL-GAP-EPS,-WALL-GAP-EPS,-EPS]) linear_extrude(dim.z+top_h+2*EPS) {
+        translate([-EPS,-EPS,-EPS]) linear_extrude(dim.z+top_h+2*EPS) {
             filler(ro,ri);
         }
     }
