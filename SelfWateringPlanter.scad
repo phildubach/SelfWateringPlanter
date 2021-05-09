@@ -1,3 +1,7 @@
+// Self Watering Planter
+// MIT License
+// Copyright (c) 2021 Phil Dubach
+
 TYPE = "OUTER"; // [OUTER, INNER, COMBINED]
 OUTER = [100, 100, 90];
 WALL = 2;
@@ -9,6 +13,7 @@ GAP = 0.2;
 INSET = 25;
 SPACING = 6;
 HOLES = 2;
+CROSS_SECTION = false;
 
 $fn = $preview ? 16 : 64;
 
@@ -51,40 +56,56 @@ module cutoff(r, a) {
 }
 
 module filler(ro, ri) {
+    f = FILLER + WALL + GAP;
     difference() {
-        square([FILLER,FILLER]);
-        translate([FILLER,FILLER]) cutoff(ri, 180);
+        square([f,f]);
+        translate([f,f]) cutoff(ri, 180);
     }
-    translate([FILLER-EPS,0]) cutoff(ro,0);
-    translate([0,FILLER-EPS]) cutoff(ro,0);
+    translate([f-EPS,0]) cutoff(ro,0);
+    translate([0,f-EPS]) cutoff(ro,0);
 }
 
 module inner_shape(dim, ro, ri, top_h, bottom_h) {
     difference() {
-        hull() {
-            translate([0,0,bottom_h+INSET])
-                linear_extrude(dim.z+top_h-bottom_h-INSET) 
-                    round_rect(dim.x, dim.y, ro);
-            translate([INSET,INSET,bottom_h]) linear_extrude(INSET)
-                round_rect(dim.x-2*INSET, dim.y-2*INSET, ro);
+        union() {
+            
+            hull() translate([WALL+GAP,WALL+GAP,0]) {
+                // main vertical shell
+                translate([0,0,bottom_h+INSET])
+                    linear_extrude(dim.z-bottom_h-INSET-top_h) 
+                        round_rect(dim.x, dim.y, ro);
+                // basket footprint
+                translate([INSET,INSET,bottom_h]) linear_extrude(INSET)
+                    round_rect(dim.x-2*INSET, dim.y-2*INSET, ro);
+            }
+            hull() {
+                translate([0,0,dim.z-top_h+WALL+GAP])
+                    linear_extrude(top_h-WALL-GAP) 
+                        round_rect(dim.x+2*(GAP+WALL), dim.y+2*(GAP+WALL), ro+GAP+WALL);
+                translate([GAP+WALL,GAP+WALL,dim.z-top_h-EPS]) linear_extrude(WALL)
+                    round_rect(dim.x, dim.y, ro+GAP+WALL);
+            }
         }
-        translate([-EPS,-EPS,-EPS]) linear_extrude(dim.z+top_h+2*EPS) {
+        translate([-WALL-GAP-EPS,-WALL-GAP-EPS,-EPS]) linear_extrude(dim.z+top_h+2*EPS) {
             filler(ro,ri);
         }
     }
-    translate([INSET,INSET,0]) linear_extrude(bottom_h+EPS)
+    // basket
+    translate([WALL+GAP+INSET,WALL+GAP+INSET,0]) linear_extrude(bottom_h+EPS)
         round_rect(dim.x-2*INSET, dim.y-2*INSET, ro);
 }
 
 module inner_shell(dim, wall, r, top_h, bottom_h) {
-    do = dim-[2*(WALL+GAP),2*(WALL+GAP),WALL+GAP];
+    do = dim-[2*(WALL+GAP),2*(WALL+GAP),WALL+GAP-top_h];
     di = do - [2*WALL,2*WALL,WALL];
     difference() {
-        translate([WALL+GAP,WALL+GAP,WALL+GAP]) {
+        translate([0,0,WALL+GAP]) {
             difference() {
                 inner_shape(do, r-WALL-GAP, r-WALL-GAP, top_h, bottom_h);
                 translate([WALL,WALL,WALL+EPS])
-                    inner_shape(di, r-2*WALL-GAP, r-GAP, top_h, bottom_h+WALL*(sqrt(2)-3)/2);
+                    inner_shape(di, r-2*WALL-GAP, r-GAP,
+                        top_h-WALL*(sqrt(2)-1)/2,
+                        bottom_h+WALL*(sqrt(2)-3)/2);
             }
         }
         for (dz = [0:SPACING:bottom_h-3*WALL-sqrt(2)*HOLES]) {
@@ -102,9 +123,13 @@ module inner_shell(dim, wall, r, top_h, bottom_h) {
     }
 }
 
-if (TYPE == "OUTER" || TYPE == "COMBINED") 
-    outer_shell(OUTER, WALL, RADIUS);
-if (TYPE == "INNER" || TYPE == "COMBINED") 
-    inner_shell(OUTER, WALL, RADIUS, TOP_H, BOTTOM_H);
-
+difference() {
+    union() {
+        if (TYPE == "OUTER" || TYPE == "COMBINED") 
+            outer_shell(OUTER, WALL, RADIUS);
+        if (TYPE == "INNER" || TYPE == "COMBINED") 
+            inner_shell(OUTER, WALL, RADIUS, TOP_H, BOTTOM_H);
+    }
+    if (CROSS_SECTION) translate([-EPS,-EPS,-EPS]) cube(OUTER+[-OUTER.x/2,-OUTER.y/2,2*EPS+TOP_H]);
+}
 
